@@ -8,7 +8,7 @@ export type Plan = { id: "basic" | "plus" | "max"; price: number; data: number; 
 export type Answer = { id: number; author: L; body: L; accepted: boolean };
 export type Question = { id: number; title: L; tag: string; votes: number; answers: Answer[] };
 export type Member = {
-  name: L; phone: string; plan: Plan["id"]; points: number; credit: number; referral: string;
+  name: L; phone: string; plan: Plan["id"]; points: number; credit: number; cash_pending: number; referral: string;
   usage: { data: number; minutes: number; sms: number }; renews_in: number;
 };
 export type Stats = {
@@ -17,17 +17,41 @@ export type Stats = {
 };
 
 export async function api<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(`/api${path}`, body === undefined ? { cache: "no-store" } : {
+  // GETs use the browser cache as the API's Cache-Control allows (plans/stats cache, member data never)
+  const r = await fetch(`/api${path}`, body === undefined ? undefined : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? r.statusText);
+  if (!r.ok) {
+    const d = (await r.json().catch(() => ({}))).detail; // string, or a list of 422 issues
+    throw Object.assign(new Error(typeof d === "string" ? d : d?.[0]?.msg ?? r.statusText), { status: r.status });
+  }
   return r.json();
 }
 
+/** Message key for a failed request. */
+export const errKey = (e: unknown): Key =>
+  ({ 429: "slow", 409: "full" } as Record<number, Key>)[(e as { status?: number })?.status ?? 0] ?? "err";
+
+/** [data, setData, retry]; retry is non-null only after a failed load. */
 export function useApi<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
-  useEffect(() => { api<T>(path).then(setData).catch(() => {}); }, [path]);
-  return [data, setData] as const;
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    setFailed(false);
+    api<T>(path).then(setData).catch(() => setFailed(true));
+  }, [path, attempt]);
+  return [data, setData, failed ? () => setAttempt((a) => a + 1) : null] as const;
+}
+
+export function LoadError({ retry }: { retry: () => void }) {
+  const { t } = useApp();
+  return (
+    <div className="empty" role="alert">
+      <p>{t("loadErr")}</p>
+      <button className="btn btn-sm btn-ghost" onClick={retry}>{t("retry")}</button>
+    </div>
+  );
 }
 
 /** Counts up from 0 when scrolled into view. */
@@ -120,12 +144,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
-      <header className="nav glass">
+      <header className="nav chrome">
         <div className="wrap nav-in">
           <Logo />
-          <nav className="nav-links">
+          <nav className="nav-links" aria-label={t("mainNav")}>
             {tabs.slice(0, 3).map((x) => (
-              <Link key={x.href} href={x.href} className={path === x.href ? "on" : ""}>{t(x.key)}</Link>
+              <Link key={x.href} href={x.href} className={path === x.href ? "on" : ""}
+                aria-current={path === x.href ? "page" : undefined}>{t(x.key)}</Link>
             ))}
           </nav>
           <div className="nav-tools">
@@ -144,9 +169,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <Logo />
         <p>{t("footer")}</p>
       </footer>
-      <nav className="tabbar glass" aria-label="tabs">
+      <nav className="tabbar chrome" aria-label={t("mainNav")}>
         {tabs.map((x) => (
-          <Link key={x.href} href={x.href} className={path === x.href ? "on" : ""}>
+          <Link key={x.href} href={x.href} className={path === x.href ? "on" : ""}
+            aria-current={path === x.href ? "page" : undefined}>
             <Icon name={x.icon} size={22} /><span>{t(x.key)}</span>
           </Link>
         ))}

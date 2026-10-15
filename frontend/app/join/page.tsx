@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useApp, type Key } from "../providers";
-import { api, Icon, useApi, type Plan } from "../ui";
+import { api, errKey, Icon, useApi, type Plan } from "../ui";
 
 const steps: Key[] = ["stepPlan", "stepInfo", "stepOk"];
-const PHONE = /^(\+98|0098|0|۰)?[9۹][0-9۰-۹]{9}$/;
+const PHONE = /^(\+98|0098|0|۰)?[9۹][0-9۰-۹]{9}$/; // the API re-checks and canonicalizes
+const PLAN_IDS = ["basic", "plus", "max"];
 
 function Confetti() {
   const colors = ["var(--a1)", "var(--a2)", "var(--a3)", "var(--ok)", "#facc15"];
@@ -26,13 +27,13 @@ export default function Join() {
   const [plans] = useApi<Plan[]>("/plans");
   const [step, setStep] = useState(0);
   const [f, setF] = useState({ plan: "plus", name: "", phone: "", city: "", esim: false });
-  const [touched, setTouched] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({}); // validate a field once it's left
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
     const p = new URLSearchParams(location.search).get("plan");
-    if (p) setF((x) => ({ ...x, plan: p }));
+    if (p && PLAN_IDS.includes(p)) setF((x) => ({ ...x, plan: p }));
   }, []);
 
   const phone = f.phone.replace(/[\s-]/g, "");
@@ -45,7 +46,7 @@ export default function Join() {
   const plan = plans?.find((p) => p.id === f.plan);
 
   const next = () => {
-    if (step === 1 && !valid) return setTouched(true);
+    if (step === 1 && !valid) return setTouched({ name: true, phone: true, city: true });
     setStep((s) => s + 1);
   };
   const submit = async () => {
@@ -53,8 +54,8 @@ export default function Join() {
     try {
       await api("/orders", { ...f, phone });
       setDone(true);
-    } catch {
-      toast(t("err"));
+    } catch (e) {
+      toast(t(errKey(e)));
     } finally {
       setBusy(false);
     }
@@ -64,9 +65,9 @@ export default function Join() {
     <div className="field">
       <label htmlFor={k}>{t(k)}</label>
       <input id={k} className="input" type={type} autoComplete={auto} value={f[k]} inputMode={k === "phone" ? "tel" : undefined}
-        dir={k === "phone" ? "ltr" : undefined} aria-invalid={touched && !!errs[k]}
-        onChange={(e) => setF({ ...f, [k]: e.target.value })} />
-      <span className="err">{touched && errs[k]}</span>
+        dir={k === "phone" ? "ltr" : "auto"} aria-invalid={!!touched[k] && !!errs[k]} aria-describedby={`${k}-err`}
+        onChange={(e) => setF({ ...f, [k]: e.target.value })} onBlur={() => setTouched((x) => ({ ...x, [k]: true }))} />
+      <span className="err" id={`${k}-err`} aria-live="polite">{touched[k] && errs[k]}</span>
     </div>
   );
 
@@ -116,7 +117,7 @@ export default function Join() {
               )}
               {step === 2 && (
                 <div className="summary">
-                  <h3 style={{ marginBottom: 6 }}>{t("review")}</h3>
+                  <h2 style={{ marginBottom: 6, fontSize: "1.17rem" }}>{t("review")}</h2>
                   <div><span className="muted">{t("stepPlan")}</span><b>{plan && t(plan.id)}</b></div>
                   <div><span className="muted">{t("name")}</span><b>{f.name}</b></div>
                   <div><span className="muted">{t("phone")}</span><b dir="ltr">{f.phone}</b></div>
