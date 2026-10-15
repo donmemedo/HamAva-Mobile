@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useApp, type Key } from "../providers";
-import { api, Counter, Icon, useApi, type Member, type Plan, type Stats } from "../ui";
+import { api, Counter, errKey, Icon, LoadError, useApi, type Member, type Plan, type Stats } from "../ui";
 
 function Ring({ used, total, label, color }: { used: number; total: number; label: string; color: string }) {
   const { n, t } = useApp();
@@ -26,7 +26,7 @@ const KINDS = ["topup", "cash", "charity"] as const;
 
 export default function Dashboard() {
   const { t, tr, n, toast } = useApp();
-  const [me, setMe] = useApi<Member>("/me");
+  const [me, setMe, retry] = useApi<Member>("/me");
   const [plans] = useApi<Plan[]>("/plans");
   const [stats] = useApi<Stats>("/stats");
   const [kind, setKind] = useState<(typeof KINDS)[number]>("topup");
@@ -34,7 +34,8 @@ export default function Dashboard() {
   const [charity, setCharity] = useState("mahak");
   const [copied, setCopied] = useState(false);
 
-  if (!me) return <div className="wrap"><div className="page-head" /><div className="dash">{[8, 4, 4, 4, 4].map((s, i) => <div key={i} className={`skeleton s${s}`} />)}</div></div>;
+  if (retry) return <div className="wrap"><div className="page-head" /><LoadError retry={retry} /></div>;
+  if (!me) return <div className="wrap"><div className="page-head" /><div className="dash">{[8, 4, 6, 6].map((s, i) => <div key={i} className={`skeleton s${s}`} />)}</div></div>;
 
   const plan = plans?.find((p) => p.id === me.plan);
   const max = Math.max(50, me.points);
@@ -43,15 +44,19 @@ export default function Dashboard() {
   const redeem = async () => {
     try {
       setMe(await api<Member>("/redeem", { kind, points: amount, charity: kind === "charity" ? charity : null }));
-      toast(`${t("redeemed")} — ${n(amount * 100)} ${t("toman")}`);
-    } catch {
-      toast(t("notEnough"));
+      toast(kind === "cash" ? t("cashReq") : `${t("redeemed")} — ${n(amount * 100)} ${t("toman")}`);
+    } catch (e) {
+      toast(t((e as { status?: number }).status === 400 ? "notEnough" : errKey(e)));
     }
   };
   const copy = async () => {
-    await navigator.clipboard?.writeText(me.referral).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    try {
+      await navigator.clipboard.writeText(me.referral); // undefined on plain-http origins: report it, don't fake it
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast(t("copyFail"));
+    }
   };
 
   return (
@@ -63,7 +68,7 @@ export default function Dashboard() {
 
       <div className="dash">
         <div className="card glass s8 rise">
-          <h3>{t("usage")}</h3>
+          <h2>{t("usage")}</h2>
           {plan && (
             <div className="rings">
               <Ring used={me.usage.data} total={plan.data} label={t("gb")} color="var(--a1)" />
@@ -80,10 +85,11 @@ export default function Dashboard() {
           <p className="muted" style={{ marginTop: 18 }}>{t("points")}</p>
           <div className="kpi grad-text" key={me.points}><Counter to={me.points} /></div>
           <p className="muted">{t("worth")}: {n(me.points * 100)} {t("toman")}</p>
+          {me.cash_pending > 0 && <p className="muted">{t("cashPending")}: {n(me.cash_pending)} {t("toman")}</p>}
         </div>
 
         <div className="card glass s6 rise">
-          <h3>{t("redeem")}</h3>
+          <h2>{t("redeem")}</h2>
           <div className="seg" style={{ "--i": KINDS.indexOf(kind) } as React.CSSProperties}>
             <span className="thumb" />
             {KINDS.map((k) => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{t(k)}</button>)}
@@ -103,7 +109,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card glass s6 rise">
-          <h3>{t("invite")}</h3>
+          <h2>{t("invite")}</h2>
           <p className="muted" style={{ marginTop: 6 }}>{t("inviteSub")}</p>
           <div className="code">
             <span>{me.referral}</span>

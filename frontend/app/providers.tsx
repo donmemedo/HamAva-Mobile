@@ -48,6 +48,9 @@ const dict = {
     redeemed: "انجام شد", notEnough: "امتیاز کافی نیست", invite: "دوستانتان را دعوت کنید",
     inviteSub: "برای هر عضو جدید ۵۰۰ امتیاز بگیرید.", copy: "کپی", copied: "کپی شد",
     earn: "راه‌های کسب امتیاز", e_answer: "پاسخ به یک سوال", e_accepted: "پاسخ تاییدشده", e_referral: "معرفی عضو جدید", e_idea: "ایده پذیرفته‌شده",
+    vote: "رای مثبت", mainNav: "منوی اصلی", close: "بستن", retry: "تلاش دوباره", loadErr: "دریافت اطلاعات انجام نشد.",
+    slow: "درخواست‌ها زیاد شد؛ کمی صبر کنید و دوباره امتحان کنید", full: "این سوال به اندازه کافی پاسخ گرفته است",
+    answered: "پاسخ شما ثبت شد", cashPending: "در انتظار پرداخت", cashReq: "درخواست برداشت ثبت شد", copyFail: "کپی انجام نشد",
   },
   en: {
     brand: "Hamava", home: "Home", community: "Community", dashboard: "Dashboard", join: "Free SIM", plans: "Plans",
@@ -91,6 +94,9 @@ const dict = {
     redeemed: "Done", notEnough: "Not enough points", invite: "Invite friends",
     inviteSub: "Get 500 points for every new member.", copy: "Copy", copied: "Copied",
     earn: "Ways to earn", e_answer: "Answer a question", e_accepted: "Accepted answer", e_referral: "Refer a member", e_idea: "Idea adopted",
+    vote: "Upvote", mainNav: "Main", close: "Close", retry: "Try again", loadErr: "Couldn't load this.",
+    slow: "Too many requests. Wait a moment and try again.", full: "This question already has enough answers",
+    answered: "Answer posted", cashPending: "Pending payout", cashReq: "Cash-out requested", copyFail: "Couldn't copy",
   },
 };
 export type Key = keyof typeof dict.fa;
@@ -149,7 +155,7 @@ export function Providers({ lang: initial, children }: { lang: Lang; children: R
     <AppCtx.Provider value={value}>
       {children}
       <div className="toast-wrap" aria-live="polite">
-        {msg && <div key={msg.id} className="toast glass">{msg.text}</div>}
+        {msg && <div key={msg.id} className="toast chrome">{msg.text}</div>}
       </div>
     </AppCtx.Provider>
   );

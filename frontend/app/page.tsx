@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useApp } from "./providers";
-import { Counter, Icon, useApi, type Plan, type Stats } from "./ui";
+import { Counter, Icon, LoadError, useApi, type Plan, type Stats } from "./ui";
 
 function SimCard() {
   const { t, n } = useApp();
@@ -30,9 +30,9 @@ function SimCard() {
         <div className="chip" />
         <div className="sim-num">0990 •••• 2026</div>
       </div>
-      <div className="float-chip glass fc1"><span className="ic"><Icon name="bolt" size={18} /></span><span><b>+{n(50)}</b> {t("chipPts")}</span></div>
-      <div className="float-chip glass fc2"><span className="ic"><Icon name="chat" size={18} /></span><span><b>{n(7)}</b> {t("chipMin")}</span></div>
-      <div className="float-chip glass fc3"><span className="ic"><Icon name="check" size={18} /></span><span><b>{n(0)}</b> {t("chipZero")}</span></div>
+      <div className="float-chip chrome fc1"><span className="ic"><Icon name="bolt" size={18} /></span><span><b>+{n(50)}</b> {t("chipPts")}</span></div>
+      <div className="float-chip chrome fc2"><span className="ic"><Icon name="chat" size={18} /></span><span><b>{n(7)}</b> {t("chipMin")}</span></div>
+      <div className="float-chip chrome fc3"><span className="ic"><Icon name="check" size={18} /></span><span><b>{n(0)}</b> {t("chipZero")}</span></div>
     </div>
   );
 }
@@ -64,7 +64,8 @@ function Calculator() {
 
 function PlanCards() {
   const { t, n } = useApp();
-  const [plans] = useApi<Plan[]>("/plans");
+  const [plans, , retry] = useApi<Plan[]>("/plans");
+  if (retry) return <LoadError retry={retry} />;
   if (!plans) return <div className="plans">{[0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ minHeight: 420 }} />)}</div>;
   return (
     <div className="plans">
@@ -87,7 +88,7 @@ function PlanCards() {
 
 export default function Home() {
   const { t, n } = useApp();
-  const [stats] = useApi<Stats>("/stats");
+  const [stats, , retryStats] = useApi<Stats>("/stats");
   return (
     <>
       <div className="wrap hero">
@@ -153,6 +154,7 @@ export default function Home() {
 
       <section className="wrap">
         <div className="sec-head reveal"><h2>{t("charT")}</h2><p>{t("charSub")}</p></div>
+        {retryStats && <LoadError retry={retryStats} />}
         <div className="charities">
           {(stats?.charities ?? []).map((c) => (
             <div key={c.id} className="charity glass reveal">

@@ -1,19 +1,30 @@
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: [/tmp]
+  restart: unless-stopped
+
 services:
   backend:
+    <<: *hardened
     build: { context: ./backend, network: host }
-    ports: ["8037:8000"]
+    # loopback only: the browser talks to the frontend, which proxies /api
+    ports: ["127.0.0.1:8037:8000"]
+    environment:
+      HAMAVA_SECURE_COOKIE: ${HAMAVA_SECURE_COOKIE:-0}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
       retries: 5
-    restart: unless-stopped
 
   frontend:
+    <<: *hardened
     build:
       context: ./frontend
       network: host
       args: { BACKEND_URL: http://backend:8000 }
     ports: ["3037:3000"]
+    tmpfs: [/tmp, "/app/.next/cache:uid=1000,gid=1000"]
     depends_on:
       backend: { condition: service_healthy }
-    restart: unless-stopped
